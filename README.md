@@ -67,6 +67,7 @@ flowchart TB
     E --> B
     B --> C
     B --> D
+    C --> F
     D --> F
 ```
 
