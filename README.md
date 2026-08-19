@@ -63,12 +63,11 @@ flowchart TB
     E["MCP Server\nDomain tools · RAG search · business context — one server, four tools"]
     F["Role Dashboards\nManager · Supervisor · Maintenance — live alerts + escalation"]
 
-    A --> B
+    A --> E
+    E --> B
     B --> C
     B --> D
-    C --> E
-    D --> E
-    E --> F
+    D --> F
 ```
 
 **Design principles:**
