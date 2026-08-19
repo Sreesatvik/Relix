@@ -1,0 +1,6 @@
+{
+  "name": "Production Disruption Early Warning System",
+  "description": "AI-enabled production disruption early warning frontend for manufacturing plant monitoring.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

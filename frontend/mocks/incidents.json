@@ -1,0 +1,190 @@
+[
+  {
+    "incident_id": "INC-204",
+    "created_at": "2026-08-19T10:32:00Z",
+    "domain_mix": ["machine", "quality"],
+    "line_id": "LINE-4",
+    "risk_score": 0.78,
+    "risk_level": "HIGH",
+    "status": "OPEN",
+    "signals": [
+      {
+        "signal_id": "SIG-00231",
+        "domain": "machine",
+        "entity_id": "M17",
+        "line_id": "LINE-4",
+        "timestamp": "2026-08-19T10:31:00Z",
+        "metric_name": "vibration_index",
+        "value": 7.8,
+        "threshold": 5.0,
+        "severity_hint": "HIGH",
+        "text_note": "Technician flagged unusual noise on Line 4 conveyor bearing"
+      }
+    ],
+    "diagnostic": {
+      "root_cause": "Machine M17 bearing wear",
+      "evidence": [
+        {
+          "source_type": "incident_report",
+          "doc_id": "INC-1042",
+          "snippet": "Similar vibration+defect pattern, resolved via bearing replacement"
+        },
+        {
+          "source_type": "maintenance_log",
+          "doc_id": "MAINT-882",
+          "snippet": "M17 last serviced 34 days ago, overdue by 6 days"
+        }
+      ],
+      "explanation": "Vibration rose 31% over 3 days alongside a defect-rate increase; maintenance is overdue and a near-identical pattern preceded a bearing failure in INC-1042."
+    },
+    "decision": {
+      "business_impact": {
+        "units_at_risk": 8400,
+        "orders_at_risk": 2,
+        "delivery_delay_hours": 11,
+        "estimated_cost_inr": 140000,
+        "severity": "CRITICAL"
+      },
+      "what_if": [
+        {
+          "action": "DO_NOTHING",
+          "units_lost": 8400,
+          "cost_inr": 140000,
+          "delay_hours": 11
+        },
+        {
+          "action": "REPAIR_NOW",
+          "units_lost": 1200,
+          "cost_inr": 40000,
+          "delay_hours": 2
+        },
+        {
+          "action": "SHIFT_TO_LINE_3",
+          "units_lost": 2100,
+          "cost_inr": 60000,
+          "delay_hours": 3
+        }
+      ],
+      "recommended_action": {
+        "action": "SHIFT_TO_LINE_3",
+        "reason": "Line 3 has spare capacity; reduces shortfall by 75% vs. doing nothing",
+        "sop_reference": "SOP-014",
+        "escalation_required": true
+      }
+    },
+    "role_summaries": {
+      "plant_manager": "Line 4 at CRITICAL risk — ₹1.4L exposure on 2 orders. Recommend shifting 30% load to Line 3.",
+      "supervisor": "M17 bearing wear likely. Shift 30% of Line 4 output to Line 3, notify maintenance.",
+      "maintenance": "M17: vibration +31%, maintenance overdue 6 days, bearing stock = 1. Inspect during next window.",
+      "quality": "Defect rate on Line 4 rose alongside a mechanical fault — expect this to resolve once M17 is serviced.",
+      "materials": "Bearing stock for M17 = 1 unit. Recommend reorder.",
+      "workforce": null
+    }
+  },
+  {
+    "incident_id": "INC-205",
+    "created_at": "2026-08-19T10:45:00Z",
+    "domain_mix": ["materials", "logistics"],
+    "line_id": "LINE-2",
+    "risk_score": 0.85,
+    "risk_level": "CRITICAL",
+    "status": "OPEN",
+    "signals": [
+      {
+        "signal_id": "SIG-00245",
+        "domain": "materials",
+        "entity_id": "RAW-STK-08",
+        "line_id": "LINE-2",
+        "timestamp": "2026-08-19T10:40:00Z",
+        "metric_name": "stock_days_remaining",
+        "value": 0.4,
+        "threshold": 2.0,
+        "severity_hint": "CRITICAL",
+        "text_note": "Resin polymer feedstock inventory critically depleted below buffer safety stock"
+      },
+      {
+        "signal_id": "SIG-00246",
+        "domain": "logistics",
+        "entity_id": "TRK-INB-91",
+        "line_id": "LINE-2",
+        "timestamp": "2026-08-19T10:42:00Z",
+        "metric_name": "supplier_delay_hours",
+        "value": 14.5,
+        "threshold": 4.0,
+        "severity_hint": "HIGH",
+        "text_note": "Supplier delivery convoy stalled due to highway monsoon closure"
+      },
+      {
+        "signal_id": "SIG-00247",
+        "domain": "logistics",
+        "entity_id": "WH-BAY-02",
+        "line_id": "LINE-2",
+        "timestamp": "2026-08-19T10:43:00Z",
+        "metric_name": "warehouse_capacity_pct",
+        "value": 96.2,
+        "threshold": 85.0,
+        "severity_hint": "MEDIUM",
+        "text_note": "Inbound quarantine bay nearing saturation awaiting alternate truck routing"
+      }
+    ],
+    "diagnostic": {
+      "root_cause": "Polymer resin feedstock depletion caused by inbound logistics delay",
+      "evidence": [
+        {
+          "source_type": "erp_inventory_feed",
+          "doc_id": "ERP-INV-4412",
+          "snippet": "Line 2 raw material bin level at 180kg, depletion within 4.5 operating hours"
+        },
+        {
+          "source_type": "telematics_log",
+          "doc_id": "LOG-SUP-819",
+          "snippet": "Vendor ApexChem shipment stalled 120km away; ETA pushed from 08:00 to 22:30"
+        }
+      ],
+      "explanation": "Stock days remaining reached 0.4 days against a 2.0 day safety threshold while inbound resin delivery from primary supplier is delayed by 14.5 hours due to highway blockage. Production on Line 2 will halt within 4.5 hours unless secondary inventory is allocated."
+    },
+    "decision": {
+      "business_impact": {
+        "units_at_risk": 12500,
+        "orders_at_risk": 3,
+        "delivery_delay_hours": 18,
+        "estimated_cost_inr": 290000,
+        "severity": "CRITICAL"
+      },
+      "what_if": [
+        {
+          "action": "DO_NOTHING",
+          "units_lost": 12500,
+          "cost_inr": 290000,
+          "delay_hours": 18
+        },
+        {
+          "action": "EXPEDITE_LOCAL_VENDOR",
+          "units_lost": 1800,
+          "cost_inr": 75000,
+          "delay_hours": 3
+        },
+        {
+          "action": "THROTTLE_LINE_2_50PCT",
+          "units_lost": 5200,
+          "cost_inr": 110000,
+          "delay_hours": 8
+        }
+      ],
+      "recommended_action": {
+        "action": "EXPEDITE_LOCAL_VENDOR",
+        "reason": "Approved local vendor PetroPlast has 5000kg equivalent grade in stock within 40km delivery radius",
+        "sop_reference": "SOP-MAT-009",
+        "escalation_required": true
+      }
+    },
+    "role_summaries": {
+      "plant_manager": "Line 2 facing feedstock stockout in 4.5 hours with ₹2.9L exposure across 3 customer orders. Expedited local sourcing recommended.",
+      "supervisor": "Line 2 resin feedstock will run dry before next shift change. Prepare staging for expedited local vendor delivery.",
+      "maintenance": "No machine maintenance actions required; machines nominal on Line 2.",
+      "quality": "Verify quality certificate and melt flow index (MFI) spec on local vendor batch before Line 2 hopper loading.",
+      "materials": "Stock days remaining at 0.4. Immediate emergency purchase order for 5000kg polymer resin from PetroPlast required.",
+      "workforce": "Potential line idle condition in shift 2 if materials are not replenished by 15:00."
+    }
+  }
+]
