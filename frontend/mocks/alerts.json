@@ -1,0 +1,23 @@
+[
+  {
+    "alert_id": "ALERT-889",
+    "incident_id": "INC-204",
+    "severity": "CRITICAL",
+    "routed_roles": ["plant_manager", "supervisor", "maintenance"],
+    "created_at": "2026-08-19T10:32:01Z"
+  },
+  {
+    "alert_id": "ALERT-890",
+    "incident_id": "INC-205",
+    "severity": "CRITICAL",
+    "routed_roles": ["plant_manager", "supervisor", "materials"],
+    "created_at": "2026-08-19T10:45:02Z"
+  },
+  {
+    "alert_id": "ALERT-891",
+    "incident_id": "INC-204",
+    "severity": "HIGH",
+    "routed_roles": ["maintenance", "quality"],
+    "created_at": "2026-08-19T10:33:15Z"
+  }
+]
