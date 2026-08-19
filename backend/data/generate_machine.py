@@ -1,7 +1,7 @@
 import random
 import uuid
 from datetime import datetime, timezone
-from backend.models import Signal
+from models import Signal
 
 # Global state to simulate progressing anomalies
 _cycle_count = 0

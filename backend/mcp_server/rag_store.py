@@ -8,7 +8,7 @@ semantic similarity.
 
 import chromadb
 from sentence_transformers import SentenceTransformer
-from backend.data.knowledge_docs import KNOWLEDGE_DOCS
+from data.knowledge_docs import KNOWLEDGE_DOCS
 
 # 1. Load the embedding model
 embedder = SentenceTransformer("all-MiniLM-L6-v2")

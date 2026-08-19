@@ -1,4 +1,4 @@
-from backend.models import Signal
+from models import Signal
 
 DOMAIN_WEIGHTS = {
     "machine": 0.30,

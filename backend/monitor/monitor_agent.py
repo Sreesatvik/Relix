@@ -1,13 +1,13 @@
 import asyncio
-from backend.models import Signal
-from backend.data.generate_machine import generate_machine_signals
-from backend.data.generate_quality import generate_quality_signals
-from backend.data.generate_materials import generate_materials_signals
-from backend.data.generate_logistics import generate_logistics_signals
-from backend.data.generate_workforce import generate_workforce_signals
-from backend.data.generate_demand import generate_demand_signals
-from backend.monitor.risk_rules import compute_risk_score
-from backend.agents.orchestrator import handle_incident
+from models import Signal
+from data.generate_machine import generate_machine_signals
+from data.generate_quality import generate_quality_signals
+from data.generate_materials import generate_materials_signals
+from data.generate_logistics import generate_logistics_signals
+from data.generate_workforce import generate_workforce_signals
+from data.generate_demand import generate_demand_signals
+from monitor.risk_rules import compute_risk_score
+from agents.orchestrator import handle_incident
 
 RISK_THRESHOLD = 0.25 # Set threshold so that our demo incidents trip it
 

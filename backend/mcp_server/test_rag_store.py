@@ -1,4 +1,4 @@
-from backend.mcp_server.rag_store import search
+from mcp_server.rag_store import search
 
 def run_tests():
     print("--- Test 1: Machine Vibration Incident ---")

@@ -1,7 +1,7 @@
 import asyncio
 import json
 import datetime
-from backend.mcp_server.server import (
+from mcp_server.server import (
     get_domain_status,
     get_signal_history,
     search_knowledge_base,

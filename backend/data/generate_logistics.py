@@ -1,7 +1,7 @@
 import random
 import uuid
 from datetime import datetime, timezone
-from backend.models import Signal
+from models import Signal
 
 _cycle_count = 0
 

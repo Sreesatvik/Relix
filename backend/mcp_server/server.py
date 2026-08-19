@@ -10,14 +10,14 @@ It provides the following 4 tools to the language model:
 """
 
 from typing import Any, List, Dict, Optional
-from backend.mcp_server.rag_store import search
-from backend.data.generate_machine import generate_machine_signals
-from backend.data.generate_quality import generate_quality_signals
-from backend.data.generate_materials import generate_materials_signals
-from backend.data.generate_logistics import generate_logistics_signals
-from backend.data.generate_workforce import generate_workforce_signals
-from backend.data.generate_demand import generate_demand_signals
-from backend.data.business_context import BUSINESS_CONTEXT
+from mcp_server.rag_store import search
+from data.generate_machine import generate_machine_signals
+from data.generate_quality import generate_quality_signals
+from data.generate_materials import generate_materials_signals
+from data.generate_logistics import generate_logistics_signals
+from data.generate_workforce import generate_workforce_signals
+from data.generate_demand import generate_demand_signals
+from data.business_context import BUSINESS_CONTEXT
 
 DOMAIN_GENERATORS = {
     "machine": generate_machine_signals,
@@ -46,7 +46,7 @@ async def get_domain_status(domain: str, entity_id: str = None, line_id: str = N
     return {
         "domain": domain,
         "count": len(signals),
-        "signals": [s.model_dump() if hasattr(s, "model_dump") else s.dict() for s in signals]
+        "signals": [s.model_dump(mode='json') if hasattr(s, "model_dump") else s.dict() for s in signals]
     }
 
 async def get_signal_history(entity_id: str, domain: str, hours: int = 72) -> list[dict]:
@@ -61,7 +61,7 @@ async def get_signal_history(entity_id: str, domain: str, hours: int = 72) -> li
     current_signals = DOMAIN_GENERATORS[domain]()
     filtered = [s for s in current_signals if s.entity_id == entity_id]
     
-    return [s.model_dump() if hasattr(s, "model_dump") else s.dict() for s in filtered]
+    return [s.model_dump(mode='json') if hasattr(s, "model_dump") else s.dict() for s in filtered]
 
 async def search_knowledge_base(query: str, doc_type: str = None, top_k: int = 5) -> list[dict]:
     """
