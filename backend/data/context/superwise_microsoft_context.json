@@ -1,0 +1,20 @@
+{
+  "source": "Superwise Manufacturing AI & Microsoft Agentic Factory Hack",
+  "synthetic_sensor_structures": {
+    "vibration": {
+      "unit": "mm/s or g",
+      "nominal": 2.0,
+      "critical_threshold": 5.0,
+      "description": "High vibration indicates bearing wear or misalignment."
+    },
+    "pressure": {
+      "unit": "psi",
+      "nominal": 100,
+      "critical_threshold": 130,
+      "description": "Sudden pressure drops indicate leaks; high pressure indicates blockages."
+    }
+  },
+  "orchestration_workflows": {
+    "tire_vulcanization_scenario": "In the Agentic Factory Hack, vulcanization temperature anomalies trigger an agent to assess the curing press. If RUL is low, the orchestration workflow automatically suggests shifting production to an alternate press, pausing material inflow to the faulty line, and paging the maintenance supervisor."
+  }
+}
