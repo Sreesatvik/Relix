@@ -41,7 +41,7 @@ async def run_monitor_loop(interval_seconds: int = 5):
                 if risk >= RISK_THRESHOLD:
                     if line_id not in _alerted_lines:
                         print(f"\\n[Monitor] ALERT: {line_id} crossed threshold with risk {risk:.2f}")
-                        handle_incident(signals, line_id)
+                        await handle_incident(signals, line_id)
                         _alerted_lines.add(line_id)
                 else:
                     # Reset if it goes below threshold
