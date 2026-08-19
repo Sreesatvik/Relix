@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import incidentsData from '../../frontend/mocks/incidents.json';
 import { DisruptionIncident } from '../types';
+import { getIncidents } from '../api';
 import { DomainFilter, DomainFilterOption } from '../components/DomainFilter';
 import {
   ShieldAlert,
@@ -17,19 +17,44 @@ export const ManagerPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [criticalOnly, setCriticalOnly] = useState<boolean>(false);
   const [selectedDomain, setSelectedDomain] = useState<DomainFilterOption>('All');
+  const [incidents, setIncidents] = useState<DisruptionIncident[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    getIncidents()
+      .then(setIncidents)
+      .catch((err) => setError(err.message))
+      .finally(() => setIsLoading(false));
+  }, []);
+
+  useEffect(() => {
+    const handleIncidentRefresh = (e: CustomEvent) => {
+      const updatedIncident = e.detail;
+      setIncidents((prev) => {
+        const exists = prev.some(inc => inc.incident_id === updatedIncident.incident_id);
+        if (exists) {
+          return prev.map(inc => inc.incident_id === updatedIncident.incident_id ? updatedIncident : inc);
+        } else {
+          return [updatedIncident, ...prev];
+        }
+      });
+    };
+    
+    window.addEventListener('incidentRefresh', handleIncidentRefresh as EventListener);
+    return () => window.removeEventListener('incidentRefresh', handleIncidentRefresh as EventListener);
+  }, []);
 
   // Parse current incident ID from URL query
   const incidentQueryId = searchParams.get('incident');
 
-  // Load and sort incidents client-side by (risk_score * estimated_cost_inr) descending
+  // Sort incidents descending by backend-provided risk_score
+  // Only show incidents that have completed agent processing (decision + diagnostic populated)
   const sortedIncidents = useMemo(() => {
-    const data = [...(incidentsData as DisruptionIncident[])];
-    return data.sort((a, b) => {
-      const exposureA = a.risk_score * a.decision.business_impact.estimated_cost_inr;
-      const exposureB = b.risk_score * b.decision.business_impact.estimated_cost_inr;
-      return exposureB - exposureA;
-    });
-  }, []);
+    return [...incidents]
+      .filter((inc) => inc.decision !== null && inc.diagnostic !== null)
+      .sort((a, b) => b.risk_score - a.risk_score);
+  }, [incidents]);
 
   // Compute domain count statistics for filter pills
   const domainCounts = useMemo(() => {
@@ -115,6 +140,13 @@ export const ManagerPage: React.FC = () => {
     }
   };
 
+  if (isLoading) {
+    return <div className="min-h-[calc(100vh-60px)] bg-[#0A0A0A] flex items-center justify-center text-zinc-400 font-mono">LOADING INCIDENTS...</div>;
+  }
+  if (error) {
+    return <div className="min-h-[calc(100vh-60px)] bg-[#0A0A0A] flex items-center justify-center text-red-500 font-mono">ERROR: {error}</div>;
+  }
+
   return (
     <div className="min-h-[calc(100vh-60px)] bg-[#0A0A0A] text-white p-4 sm:p-6 lg:p-8 font-sans">
       <div className="max-w-[1600px] mx-auto space-y-6">
@@ -175,7 +207,7 @@ export const ManagerPage: React.FC = () => {
                 Visible Incidents ({displayedIncidents.length})
               </h2>
               <span className="text-[10px] font-mono text-zinc-500 uppercase">
-                SORT: RISK × EXPOSURE DESC
+                SORT: RISK SCORE DESC
               </span>
             </div>
 
@@ -189,7 +221,7 @@ export const ManagerPage: React.FC = () => {
                   const isSelected = activeIncident?.incident_id === incident.incident_id;
                   const styles = getRiskLevelStyles(incident.risk_level);
                   const financialExposure =
-                    incident.risk_score * incident.decision.business_impact.estimated_cost_inr;
+                    incident.risk_score * (incident.decision?.business_impact.estimated_cost_inr ?? 0);
 
                   return (
                     <div
@@ -225,7 +257,7 @@ export const ManagerPage: React.FC = () => {
                             Estimated Cost Exposure
                           </p>
                           <p className="text-3xl sm:text-4xl font-black text-white tracking-tighter leading-none mt-1">
-                            {formatINR(incident.decision.business_impact.estimated_cost_inr)}
+                            {formatINR(incident.decision?.business_impact.estimated_cost_inr ?? 0)}
                           </p>
                         </div>
                         <div className="text-right">
@@ -291,7 +323,7 @@ export const ManagerPage: React.FC = () => {
                     Plant Manager Executive Summary
                   </p>
                   <p className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-white leading-snug">
-                    "{activeIncident.role_summaries.plant_manager}"
+                    "{activeIncident.role_summaries?.plant_manager}"
                   </p>
                 </div>
 
@@ -299,26 +331,26 @@ export const ManagerPage: React.FC = () => {
                   <div>
                     <p className="text-[10px] font-mono text-zinc-400 uppercase">Units at Risk</p>
                     <p className="text-2xl font-black text-white tracking-tight">
-                      {activeIncident.decision.business_impact.units_at_risk.toLocaleString('en-IN')}
+                      {activeIncident.decision?.business_impact.units_at_risk.toLocaleString('en-IN')}
                     </p>
                   </div>
                   <div>
                     <p className="text-[10px] font-mono text-zinc-400 uppercase">Orders at Risk</p>
                     <p className="text-2xl font-black text-white tracking-tight">
-                      {activeIncident.decision.business_impact.orders_at_risk}
+                      {activeIncident.decision?.business_impact.orders_at_risk}
                     </p>
                   </div>
                   <div>
                     <p className="text-[10px] font-mono text-zinc-400 uppercase">Delivery Delay</p>
                     <p className="text-2xl font-black text-red-400 tracking-tight flex items-baseline gap-1">
-                      {activeIncident.decision.business_impact.delivery_delay_hours}
+                      {activeIncident.decision?.business_impact.delivery_delay_hours}
                       <span className="text-xs font-mono text-zinc-400">hrs</span>
                     </p>
                   </div>
                   <div>
                     <p className="text-[10px] font-mono text-zinc-400 uppercase">Financial Impact</p>
                     <p className="text-2xl font-black text-red-500 tracking-tight">
-                      {formatINR(activeIncident.decision.business_impact.estimated_cost_inr)}
+                      {formatINR(activeIncident.decision?.business_impact.estimated_cost_inr ?? 0)}
                     </p>
                   </div>
                 </div>
@@ -346,11 +378,11 @@ export const ManagerPage: React.FC = () => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/10 font-mono">
-                        {activeIncident.decision.what_if.map((scenario, index) => {
+                        {(activeIncident.decision?.what_if ?? []).map((scenario, index) => {
                           const isDoNothing = scenario.action.toUpperCase() === 'DO_NOTHING';
                           const isRecommended =
                             scenario.action ===
-                            activeIncident.decision.recommended_action.action;
+                            activeIncident.decision?.recommended_action.action;
 
                           let rowClasses = 'bg-zinc-900/40 text-zinc-300';
                           let badge = null;
@@ -406,9 +438,9 @@ export const ManagerPage: React.FC = () => {
 
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-mono bg-black/80 border border-emerald-500/50 text-emerald-300 px-2.5 py-0.5 font-bold">
-                        SOP: {activeIncident.decision.recommended_action.sop_reference}
+                        SOP: {activeIncident.decision?.recommended_action.sop_reference ?? 'N/A'}
                       </span>
-                      {activeIncident.decision.recommended_action.escalation_required && (
+                      {activeIncident.decision?.recommended_action.escalation_required && (
                         <span className="text-[10px] font-mono bg-red-600 text-white px-2 py-0.5 font-bold uppercase">
                           ESCALATION REQUIRED
                         </span>
@@ -417,21 +449,21 @@ export const ManagerPage: React.FC = () => {
                   </div>
 
                   <p className="text-lg font-black text-white tracking-tight uppercase">
-                    {activeIncident.decision.recommended_action.action.replace(/_/g, ' ')}
+                    {activeIncident.decision?.recommended_action.action.replace(/_/g, ' ')}
                   </p>
 
                   <p className="text-zinc-300 text-sm leading-relaxed">
-                    <strong>Reasoning:</strong> {activeIncident.decision.recommended_action.reason}
+                    <strong>Reasoning:</strong> {activeIncident.decision?.recommended_action.reason}
                   </p>
                 </div>
 
                 <div className="border-t border-white/10 pt-4 space-y-2 text-xs font-mono text-zinc-400">
                   <div className="flex items-start gap-2">
                     <strong className="text-zinc-200 shrink-0">DIAGNOSTIC ROOT CAUSE:</strong>
-                    <span className="text-zinc-300">{activeIncident.diagnostic.root_cause}</span>
+                    <span className="text-zinc-300">{activeIncident.diagnostic?.root_cause}</span>
                   </div>
                   <p className="text-zinc-400 italic text-[11px] leading-relaxed">
-                    {activeIncident.diagnostic.explanation}
+                    {activeIncident.diagnostic?.explanation}
                   </p>
                 </div>
               </div>

@@ -34,16 +34,14 @@ async def run(signals: List[Signal], line_id: str) -> DiagnosticResult:
     tool_results = await asyncio.gather(
         *domain_status_tasks,
         get_signal_history(entity_id=primary_entity_id, domain=domains[0]),
-        search_knowledge_base(query=f"anomaly on {line_id} entity {primary_entity_id}", doc_type="incident_report", top_k=5),
-        search_knowledge_base(query=f"root cause {line_id}", doc_type="root_cause_analysis", top_k=3)
+        search_knowledge_base(query=f"anomaly on {line_id} entity {primary_entity_id} root cause", doc_type=["incident_report", "root_cause_analysis"], top_k=5)
     )
     
     # Unpack results
     num_domains = len(domains)
     domain_statuses = tool_results[:num_domains]
     signal_history = tool_results[num_domains]
-    incident_reports = tool_results[num_domains + 1]
-    rca_docs = tool_results[num_domains + 2]
+    rag_docs = tool_results[num_domains + 1]
     
     # 3. Build Prompt
     system_prompt = f"""
@@ -60,6 +58,9 @@ async def run(signals: List[Signal], line_id: str) -> DiagnosticResult:
        - Describe the trend (e.g., "vibration rising 15%/day")
        - If a similar historical incident exists, cite it
 
+    CRITICAL INSTRUCTION ON HALLUCINATION:
+    You must NEVER fabricate or hallucinate evidence or documents. If the retrieved documents (SIMILAR PAST INCIDENTS & ROOT CAUSE DOCS) are empty or none of the retrieved documents are relevant, explicitly state "No relevant evidence found in knowledge base" rather than inventing a document. Do not invent doc_ids.
+    
     Respond strictly in JSON matching this schema:
     {DiagnosticResult.model_json_schema()}
     """
@@ -68,8 +69,7 @@ async def run(signals: List[Signal], line_id: str) -> DiagnosticResult:
     SIGNALS: {json.dumps([s.model_dump(mode='json') for s in signals])}
     DOMAIN STATUSES: {json.dumps(domain_statuses)}
     TREND HISTORY (72h): {json.dumps(signal_history)}
-    SIMILAR PAST INCIDENTS: {json.dumps(incident_reports)}
-    ROOT CAUSE DOCS: {json.dumps(rca_docs)}
+    SIMILAR PAST INCIDENTS & ROOT CAUSE DOCS: {json.dumps(rag_docs)}
     """
     
     # 4. LLM Call

@@ -22,7 +22,7 @@ export const RoleSwitcher: React.FC<RoleSwitcherProps> = ({
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
             <span className="font-mono text-xs sm:text-sm font-black text-white tracking-widest uppercase">
-              Vanguard-AI // Operations Hub
+              Relix // Operations Hub
             </span>
           </div>
 

@@ -10,7 +10,7 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({
-  systemTitle = 'System: Vanguard-AI // Early Warning',
+  systemTitle = 'System: Relix // Early Warning',
   subTitle = 'MANUFACTURING DISRUPTION FEED',
   lastSync = 'LIVE SYNC',
   isOnline = true,

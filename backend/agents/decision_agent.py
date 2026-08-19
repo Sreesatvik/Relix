@@ -30,21 +30,17 @@ async def run(signals: List[Signal], line_id: str) -> DecisionResult:
     # 1. Run tools concurrently
     tool_results = await asyncio.gather(
         get_business_context(line_id=line_id),
-        search_knowledge_base(query=f"SOP for {line_id}", doc_type="sop", top_k=3),
-        search_knowledge_base(query=f"playbook {line_id}", doc_type="response_playbook", top_k=3),
-        search_knowledge_base(query=f"escalation {line_id}", doc_type="escalation_policy", top_k=2)
+        search_knowledge_base(query=f"SOP playbook escalation {line_id}", doc_type=["sop", "response_playbook", "escalation_policy"], top_k=5)
     )
     
     business_context = tool_results[0]
-    sops = tool_results[1]
-    playbooks = tool_results[2]
-    escalation_policies = tool_results[3]
+    rag_docs = tool_results[1]
     
     # 2. Build Prompt
     system_prompt = f"""
     You are a senior plant operations director and decision engine.
     
-    Given real-time signals, business context (targets/costs), and SOPs,
+    Given real-time signals, business context (targets/costs), and SOPs/Playbooks,
     determine:
     1. BUSINESS IMPACT — quantify what is currently at risk
     2. WHAT-IF PROJECTIONS — project losses across these 3 scenarios using the provided multipliers:
@@ -53,6 +49,9 @@ async def run(signals: List[Signal], line_id: str) -> DecisionResult:
     3. RECOMMENDED ACTION — what should we do right now?
     4. ROLE SUMMARIES — 1-sentence summaries for different personas (plant_manager, supervisor, maintenance, quality, materials, workforce)
     
+    CRITICAL INSTRUCTION ON HALLUCINATION:
+    You must NEVER fabricate or hallucinate evidence or documents. If the retrieved documents (SOPs, Playbooks, Escalation Policies) are empty or none of the retrieved documents are relevant, explicitly state "No relevant evidence found in knowledge base" rather than inventing a document or SOP reference. Do not invent doc_ids or sop_references.
+    
     Respond strictly in JSON matching this schema:
     {DecisionResult.model_json_schema()}
     """
@@ -60,9 +59,7 @@ async def run(signals: List[Signal], line_id: str) -> DecisionResult:
     user_prompt = f"""
     SIGNALS: {json.dumps([s.model_dump(mode='json') for s in signals])}
     BUSINESS CONTEXT: {json.dumps(business_context)}
-    SOPS: {json.dumps(sops)}
-    PLAYBOOKS: {json.dumps(playbooks)}
-    ESCALATION POLICIES: {json.dumps(escalation_policies)}
+    RAG DOCS (SOPs, Playbooks, Escalation Policies): {json.dumps(rag_docs)}
     """
     
     # 3. LLM Call

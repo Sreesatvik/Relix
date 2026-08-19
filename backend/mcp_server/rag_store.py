@@ -7,6 +7,7 @@ semantic similarity.
 """
 
 import chromadb
+from typing import Union, List
 from sentence_transformers import SentenceTransformer
 from data.knowledge_docs import KNOWLEDGE_DOCS
 
@@ -52,16 +53,22 @@ def build_index():
         ids=ids
     )
 
-def search(query: str, doc_type: str = None, top_k: int = 5) -> list[dict]:
+def search(query: str, doc_type: Union[str, List[str]] = None, top_k: int = 5) -> list[dict]:
     """
     Search the RAG store for documents similar to the query.
-    Optionally filter by doc_type.
+    Optionally filter by doc_type (can be a string or a list of strings).
     """
     query_embedding = embedder.encode(query).tolist()
     
     where_clause = None
     if doc_type:
-        where_clause = {"doc_type": doc_type}
+        if isinstance(doc_type, list):
+            if len(doc_type) == 1:
+                where_clause = {"doc_type": doc_type[0]}
+            else:
+                where_clause = {"doc_type": {"$in": doc_type}}
+        else:
+            where_clause = {"doc_type": doc_type}
         
     results = collection.query(
         query_embeddings=[query_embedding],

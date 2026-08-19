@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import incidentsData from '../../frontend/mocks/incidents.json';
 import { DisruptionIncident } from '../types';
+import { getIncidents, updateIncidentStatus } from '../api';
 import { DomainFilter, DomainFilterOption } from '../components/DomainFilter';
 import {
   Wrench,
@@ -14,9 +14,33 @@ import {
 
 export const MaintenancePage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [incidents, setIncidents] = useState<DisruptionIncident[]>(
-    incidentsData as DisruptionIncident[]
-  );
+  const [incidents, setIncidents] = useState<DisruptionIncident[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    getIncidents()
+      .then(setIncidents)
+      .catch((err) => setError(err.message))
+      .finally(() => setIsLoading(false));
+  }, []);
+
+  useEffect(() => {
+    const handleIncidentRefresh = (e: CustomEvent) => {
+      const updatedIncident = e.detail;
+      setIncidents((prev) => {
+        const exists = prev.some(inc => inc.incident_id === updatedIncident.incident_id);
+        if (exists) {
+          return prev.map(inc => inc.incident_id === updatedIncident.incident_id ? updatedIncident : inc);
+        } else {
+          return [updatedIncident, ...prev];
+        }
+      });
+    };
+    
+    window.addEventListener('incidentRefresh', handleIncidentRefresh as EventListener);
+    return () => window.removeEventListener('incidentRefresh', handleIncidentRefresh as EventListener);
+  }, []);
   const [selectedDomain, setSelectedDomain] = useState<DomainFilterOption>('All');
   const [acknowledgedCards, setAcknowledgedCards] = useState<Record<string, boolean>>({});
 
@@ -47,11 +71,26 @@ export const MaintenancePage: React.FC = () => {
     setSearchParams({ incident: id });
   };
 
-  const toggleAcknowledge = (id: string) => {
-    setAcknowledgedCards((prev) => ({
-      ...prev,
-      [id]: !prev[id],
-    }));
+  const toggleAcknowledge = async (id: string) => {
+    const previousIncidents = [...incidents];
+    const previousAck = { ...acknowledgedCards };
+
+    setIncidents((prev) =>
+      prev.map((inc) => (inc.incident_id === id ? { ...inc, status: 'ACKNOWLEDGED' } : inc))
+    );
+    setAcknowledgedCards((prev) => ({ ...prev, [id]: true }));
+
+    try {
+      const updatedIncident = await updateIncidentStatus(id, 'ACKNOWLEDGED');
+      setIncidents((prev) =>
+        prev.map((inc) => (inc.incident_id === id ? updatedIncident : inc))
+      );
+    } catch (err: any) {
+      console.error('Failed to acknowledge:', err);
+      setIncidents(previousIncidents);
+      setAcknowledgedCards(previousAck);
+      alert(`Failed to update status: ${err.message || 'Unknown error'}`);
+    }
   };
 
   const getRiskLevelStyles = (level: string) => {
@@ -83,6 +122,13 @@ export const MaintenancePage: React.FC = () => {
         };
     }
   };
+
+  if (isLoading) {
+    return <div className="min-h-[calc(100vh-60px)] bg-[#0A0A0A] flex items-center justify-center text-zinc-400 font-mono">LOADING INCIDENTS...</div>;
+  }
+  if (error) {
+    return <div className="min-h-[calc(100vh-60px)] bg-[#0A0A0A] flex items-center justify-center text-red-500 font-mono">ERROR: {error}</div>;
+  }
 
   return (
     <div className="min-h-[calc(100vh-60px)] bg-[#0A0A0A] text-white p-4 sm:p-6 lg:p-8 font-sans">
@@ -121,8 +167,8 @@ export const MaintenancePage: React.FC = () => {
             filteredIncidents.map((incident) => {
               const isSelected = incidentQueryId === incident.incident_id;
               const styles = getRiskLevelStyles(incident.risk_level);
-              const isAcked = acknowledgedCards[incident.incident_id];
-              const hasMaintenanceDirective = Boolean(incident.role_summaries.maintenance);
+              const isAcked = acknowledgedCards[incident.incident_id] || incident.status === 'ACKNOWLEDGED';
+              const hasMaintenanceDirective = Boolean(incident.role_summaries?.maintenance);
 
               return (
                 <div
@@ -166,7 +212,7 @@ export const MaintenancePage: React.FC = () => {
                         DIAGNOSED ROOT CAUSE
                       </p>
                       <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight uppercase leading-tight">
-                        {incident.diagnostic.root_cause}
+                        {incident.diagnostic?.root_cause}
                       </h2>
                     </div>
 
@@ -178,7 +224,7 @@ export const MaintenancePage: React.FC = () => {
                       </p>
                       <p className="text-base sm:text-lg font-bold text-zinc-100 leading-relaxed">
                         {hasMaintenanceDirective
-                          ? incident.role_summaries.maintenance
+                          ? incident.role_summaries?.maintenance
                           : 'No active mechanical repairs logged for this incident. Machine sensors operating within normal thresholds.'}
                       </p>
                     </div>
@@ -187,11 +233,11 @@ export const MaintenancePage: React.FC = () => {
                     <div className="space-y-2.5 pt-1">
                       <p className="text-xs font-mono uppercase tracking-widest text-zinc-400 flex items-center gap-1.5">
                         <Search className="w-3.5 h-3.5 text-zinc-400" />
-                        Diagnostic Evidence Stream ({incident.diagnostic.evidence.length})
+                        Diagnostic Evidence Stream ({incident.diagnostic?.evidence.length ?? 0})
                       </p>
 
                       <div className="space-y-2">
-                        {incident.diagnostic.evidence.map((item, idx) => (
+                        {(incident.diagnostic?.evidence ?? []).map((item, idx) => (
                           <div
                             key={idx}
                             className="bg-zinc-950 border border-zinc-800 p-3 font-mono text-xs space-y-1"
@@ -237,7 +283,7 @@ export const MaintenancePage: React.FC = () => {
                   {/* Card Footer Actions */}
                   <div className="p-4 sm:p-5 bg-black/40 border-t border-white/10 flex justify-between items-center gap-3">
                     <span className="text-[11px] font-mono text-zinc-400">
-                      SOP: {incident.decision.recommended_action.sop_reference}
+                      SOP: {incident.decision?.recommended_action.sop_reference ?? 'N/A'}
                     </span>
 
                     <button

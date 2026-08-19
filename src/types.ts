@@ -1,34 +1,46 @@
+// ── Signal ─────────────────────────────────────────────────
 export interface DisruptionSignal {
   signal_id: string;
   domain: string;
   entity_id: string;
   line_id: string;
-  timestamp: string;
+  timestamp: string;           // ISO string from backend datetime
   metric_name: string;
   value: number;
   threshold: number;
-  severity_hint: string;
-  text_note: string;
+  severity_hint: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  text_note: string | null;    // Optional[str] in Python — can be null
 }
 
+// ── Diagnostic ─────────────────────────────────────────────
 export interface DiagnosticEvidence {
   source_type: string;
   doc_id: string;
   snippet: string;
 }
 
+export interface PredictionInfo {
+  time_to_failure_hours: number | null;
+  confidence: 'LOW' | 'MEDIUM' | 'HIGH';
+  trend_direction: 'rising' | 'stable' | 'falling';
+  trend_description: string;
+  historical_match: string | null;
+}
+
 export interface Diagnostic {
   root_cause: string;
   evidence: DiagnosticEvidence[];
   explanation: string;
+  prediction: PredictionInfo;
 }
 
+// ── Decision ───────────────────────────────────────────────
 export interface BusinessImpact {
   units_at_risk: number;
   orders_at_risk: number;
   delivery_delay_hours: number;
   estimated_cost_inr: number;
-  severity: string;
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 }
 
 export interface WhatIfScenario {
@@ -41,7 +53,7 @@ export interface WhatIfScenario {
 export interface RecommendedAction {
   action: string;
   reason: string;
-  sop_reference: string;
+  sop_reference: string | null;  // Optional[str] in Python — can be null
   escalation_required: boolean;
 }
 
@@ -51,6 +63,7 @@ export interface Decision {
   recommended_action: RecommendedAction;
 }
 
+// ── Role Summaries ─────────────────────────────────────────
 export interface RoleSummaries {
   plant_manager: string | null;
   supervisor: string | null;
@@ -58,29 +71,33 @@ export interface RoleSummaries {
   quality: string | null;
   materials: string | null;
   workforce: string | null;
+  [key: string]: string | null;  // allow extra keys from backend Dict
 }
 
+// ── Incident ───────────────────────────────────────────────
 export interface DisruptionIncident {
   incident_id: string;
-  created_at: string;
+  created_at: string;           // ISO string from backend datetime
   domain_mix: string[];
   line_id: string;
   risk_score: number;
-  risk_level: string;
-  status: string;
+  risk_level: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  status: 'OPEN' | 'ACKNOWLEDGED' | 'ESCALATED' | 'RESOLVED';
   signals: DisruptionSignal[];
-  diagnostic: Diagnostic;
-  decision: Decision;
-  role_summaries: RoleSummaries;
+  diagnostic: Diagnostic | null;      // Optional in backend
+  decision: Decision | null;          // Optional in backend
+  role_summaries: RoleSummaries | null; // Optional in backend
 }
 
+// ── Alert ──────────────────────────────────────────────────
 export interface Alert {
   alert_id: string;
   incident_id: string;
-  severity: string;
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   routed_roles: string[];
-  created_at: string;
+  created_at: string;          // ISO string from backend datetime
 }
+
 
 export type RiskLevel = 'CRITICAL' | 'WARNING' | 'NOMINAL' | 'HIGH' | 'MEDIUM' | 'LOW';
 

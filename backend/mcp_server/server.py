@@ -9,7 +9,7 @@ It provides the following 4 tools to the language model:
 4. get_business_context
 """
 
-from typing import Any, List, Dict, Optional
+from typing import Any, List, Dict, Optional, Union
 from mcp_server.rag_store import search
 from data.generate_machine import generate_machine_signals
 from data.generate_quality import generate_quality_signals
@@ -63,7 +63,7 @@ async def get_signal_history(entity_id: str, domain: str, hours: int = 72) -> li
     
     return [s.model_dump(mode='json') if hasattr(s, "model_dump") else s.dict() for s in filtered]
 
-async def search_knowledge_base(query: str, doc_type: str = None, top_k: int = 5) -> list[dict]:
+async def search_knowledge_base(query: str, doc_type: Union[str, List[str]] = None, top_k: int = 5) -> list[dict]:
     """
     Search the RAG store for standard operating procedures, root cause analyses,
     incident reports, and response playbooks related to the query.

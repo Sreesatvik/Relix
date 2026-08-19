@@ -37,18 +37,21 @@ async def run_monitor_loop(interval_seconds: int = 5):
                 
             # 3. Compute risk and fire alerts
             for line_id, signals in signals_by_line.items():
-                risk = compute_risk_score(signals)
-                if risk >= RISK_THRESHOLD:
-                    if line_id not in _alerted_lines:
-                        print(f"\\n[Monitor] ALERT: {line_id} crossed threshold with risk {risk:.2f}")
-                        await handle_incident(signals, line_id)
-                        _alerted_lines.add(line_id)
-                else:
-                    # Reset if it goes below threshold
-                    if line_id in _alerted_lines:
-                        _alerted_lines.remove(line_id)
-            
+                try:
+                    risk = compute_risk_score(signals)
+                    if risk >= RISK_THRESHOLD:
+                        if line_id not in _alerted_lines:
+                            print(f"\\n[Monitor] ALERT: {line_id} crossed threshold with risk {risk:.2f}")
+                            await handle_incident(signals, line_id)
+                            _alerted_lines.add(line_id)
+                    else:
+                        # Reset if it goes below threshold
+                        if line_id in _alerted_lines:
+                            _alerted_lines.remove(line_id)
+                except Exception as e:
+                    print(f"[Monitor] Error processing line {line_id}: {e}")
+                    
         except Exception as e:
-            print(f"[Monitor] Error in loop: {e}")
+            print(f"[Monitor] Critical Error in loop data generation: {e}")
             
         await asyncio.sleep(interval_seconds)

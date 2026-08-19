@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
-import mockAlertsData from '../../frontend/mocks/alerts.json';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Alert } from '../types';
+import { getIncident } from '../api';
 
 export interface AlertFeedState {
   latestAlert: Alert | null;
@@ -11,29 +12,21 @@ export interface AlertFeedState {
   lastUpdated: string;
 }
 
-/**
- * useAlertFeed Hook
- * 
- * Isolates all real-time / streaming alert ingestion logic.
- * Currently simulates scheduled alerts from mocks/alerts.json.
- * To switch to real WebSocket or SSE in production, modify ONLY this hook.
- */
 export function useAlertFeed(): AlertFeedState {
+  const location = useLocation();
+  const currentRole = location.pathname.includes('/manager') ? 'plant_manager' :
+                      location.pathname.includes('/supervisor') ? 'supervisor' :
+                      location.pathname.includes('/maintenance') ? 'maintenance' : '';
+
   const [allAlerts, setAllAlerts] = useState<Alert[]>([]);
   const [latestAlert, setLatestAlert] = useState<Alert | null>(null);
-  const [isConnected, setIsConnected] = useState<boolean>(true);
-  const [lastUpdated, setLastUpdated] = useState<string>('');
+  const [isConnected, setIsConnected] = useState<boolean>(false);
+  const [lastUpdated, setLastUpdated] = useState<string>('Not connected');
 
-  // Ticking timestamp for live monitoring indicator
-  useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      setLastUpdated(now.toTimeString().split(' ')[0] + ' UTC');
-    };
-    updateTime();
-    const interval = setInterval(updateTime, 1000);
-    return () => clearInterval(interval);
-  }, []);
+  const ws = useRef<WebSocket | null>(null);
+  const reconnectAttempts = useRef(0);
+  const maxReconnectDelay = 30000; // max 30s
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const dismissAlert = useCallback(() => {
     setLatestAlert(null);
@@ -44,41 +37,84 @@ export function useAlertFeed(): AlertFeedState {
     setAllAlerts((prev) => [alert, ...prev]);
   }, []);
 
-  // Simulate alerts firing for jury demo
+  const connectWebSocket = useCallback(() => {
+    if (ws.current) {
+      ws.current.close();
+    }
+
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+    const wsUrl = baseUrl.replace(/^http/, 'ws') + '/ws/alerts';
+    
+    const socket = new WebSocket(wsUrl);
+    ws.current = socket;
+
+    socket.onopen = () => {
+      setIsConnected(true);
+      setLastUpdated(new Date().toLocaleTimeString());
+      reconnectAttempts.current = 0;
+    };
+
+    socket.onmessage = async (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        // Only process Alert objects (ignore incident status updates sent by ws_manager)
+        if (data.alert_id && data.routed_roles && Array.isArray(data.routed_roles)) {
+          // Check if current role is in routed_roles
+          if (currentRole && data.routed_roles.includes(currentRole)) {
+            const alert = data as Alert;
+            setLatestAlert(alert);
+            setAllAlerts((prev) => {
+              // prevent duplicates
+              if (prev.some(a => a.alert_id === alert.alert_id)) return prev;
+              return [alert, ...prev];
+            });
+
+            // Fetch latest incident data and dispatch event for pages to update
+            try {
+              const updatedIncident = await getIncident(alert.incident_id);
+              window.dispatchEvent(new CustomEvent('incidentRefresh', { detail: updatedIncident }));
+            } catch (err) {
+              console.error('Failed to refresh incident data after alert:', err);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Malformed WebSocket message:', err);
+      }
+    };
+
+    socket.onclose = () => {
+      setIsConnected(false);
+      
+      // Exponential backoff reconnect
+      const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), maxReconnectDelay);
+      reconnectAttempts.current += 1;
+      
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      reconnectTimeoutRef.current = setTimeout(connectWebSocket, delay);
+    };
+
+    socket.onerror = (err) => {
+      console.error('WebSocket Error:', err);
+      // Let onclose handle reconnect
+    };
+  }, [currentRole]);
+
   useEffect(() => {
-    const alertsList: Alert[] = mockAlertsData as Alert[];
-    if (alertsList.length === 0) return;
-
-    // Fire first alert after 2.5 seconds
-    const timer1 = setTimeout(() => {
-      if (alertsList[0]) {
-        setLatestAlert(alertsList[0]);
-        setAllAlerts((prev) => [alertsList[0], ...prev]);
-      }
-    }, 2500);
-
-    // Fire second alert after 18 seconds
-    const timer2 = setTimeout(() => {
-      if (alertsList[1]) {
-        setLatestAlert(alertsList[1]);
-        setAllAlerts((prev) => [alertsList[1], ...prev]);
-      }
-    }, 18000);
-
-    // Fire third alert after 36 seconds
-    const timer3 = setTimeout(() => {
-      if (alertsList[2]) {
-        setLatestAlert(alertsList[2]);
-        setAllAlerts((prev) => [alertsList[2], ...prev]);
-      }
-    }, 36000);
+    connectWebSocket();
 
     return () => {
-      clearTimeout(timer1);
-      clearTimeout(timer2);
-      clearTimeout(timer3);
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      if (ws.current) {
+        ws.current.close();
+        ws.current = null;
+      }
     };
-  }, []);
+  }, [connectWebSocket]);
 
   // Auto-dismiss latest alert toast after ~6 seconds
   useEffect(() => {

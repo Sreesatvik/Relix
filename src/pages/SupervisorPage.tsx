@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import incidentsData from '../../frontend/mocks/incidents.json';
 import { DisruptionIncident } from '../types';
+import { getIncidents, updateIncidentStatus } from '../api';
 import { DomainFilter, DomainFilterOption } from '../components/DomainFilter';
 import {
   UserCheck,
@@ -16,9 +16,33 @@ import {
 
 export const SupervisorPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [incidents, setIncidents] = useState<DisruptionIncident[]>(
-    incidentsData as DisruptionIncident[]
-  );
+  const [incidents, setIncidents] = useState<DisruptionIncident[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    getIncidents()
+      .then(setIncidents)
+      .catch((err) => setError(err.message))
+      .finally(() => setIsLoading(false));
+  }, []);
+
+  useEffect(() => {
+    const handleIncidentRefresh = (e: CustomEvent) => {
+      const updatedIncident = e.detail;
+      setIncidents((prev) => {
+        const exists = prev.some(inc => inc.incident_id === updatedIncident.incident_id);
+        if (exists) {
+          return prev.map(inc => inc.incident_id === updatedIncident.incident_id ? updatedIncident : inc);
+        } else {
+          return [updatedIncident, ...prev];
+        }
+      });
+    };
+    
+    window.addEventListener('incidentRefresh', handleIncidentRefresh as EventListener);
+    return () => window.removeEventListener('incidentRefresh', handleIncidentRefresh as EventListener);
+  }, []);
   const [selectedLine, setSelectedLine] = useState<string>('LINE-4');
   const [selectedDomain, setSelectedDomain] = useState<DomainFilterOption>('All');
 
@@ -85,12 +109,27 @@ export const SupervisorPage: React.FC = () => {
     setSearchParams({ incident: id });
   };
 
-  const handleUpdateStatus = (incidentId: string, newStatus: 'ACKNOWLEDGED' | 'ESCALATED' | 'RESOLVED') => {
+  const handleUpdateStatus = async (incidentId: string, newStatus: 'ACKNOWLEDGED' | 'ESCALATED' | 'RESOLVED') => {
+    // Optimistic update
+    const previousIncidents = [...incidents];
     setIncidents((prev) =>
       prev.map((inc) =>
         inc.incident_id === incidentId ? { ...inc, status: newStatus } : inc
       )
     );
+
+    try {
+      const updatedIncident = await updateIncidentStatus(incidentId, newStatus);
+      // Ensure we have the exact backend state
+      setIncidents((prev) =>
+        prev.map((inc) => (inc.incident_id === incidentId ? updatedIncident : inc))
+      );
+    } catch (err: any) {
+      console.error('Failed to update status:', err);
+      // Rollback
+      setIncidents(previousIncidents);
+      alert(`Failed to update status: ${err.message || 'Unknown error'}`);
+    }
   };
 
   const formatINR = (amount: number) => `₹${amount.toLocaleString('en-IN')}`;
@@ -150,6 +189,13 @@ export const SupervisorPage: React.FC = () => {
         };
     }
   };
+
+  if (isLoading) {
+    return <div className="min-h-[calc(100vh-60px)] bg-[#0A0A0A] flex items-center justify-center text-zinc-400 font-mono">LOADING INCIDENTS...</div>;
+  }
+  if (error) {
+    return <div className="min-h-[calc(100vh-60px)] bg-[#0A0A0A] flex items-center justify-center text-red-500 font-mono">ERROR: {error}</div>;
+  }
 
   return (
     <div className="min-h-[calc(100vh-60px)] bg-[#0A0A0A] text-white p-4 sm:p-6 lg:p-8 font-sans">
@@ -261,7 +307,7 @@ export const SupervisorPage: React.FC = () => {
                             Estimated Cost Exposure
                           </p>
                           <p className="text-3xl font-black text-white tracking-tighter leading-none mt-1">
-                            {formatINR(incident.decision.business_impact.estimated_cost_inr)}
+                            {formatINR(incident.decision?.business_impact.estimated_cost_inr ?? 0)}
                           </p>
                         </div>
                         <div className="text-right">
@@ -408,7 +454,7 @@ export const SupervisorPage: React.FC = () => {
                     Line Supervisor Directive
                   </p>
                   <p className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-white leading-snug">
-                    "{activeIncident.role_summaries.supervisor}"
+                    "{activeIncident.role_summaries?.supervisor}"
                   </p>
                 </div>
 
@@ -417,11 +463,11 @@ export const SupervisorPage: React.FC = () => {
                     <div className="flex items-center gap-2">
                       <CheckCircle2 className="w-5 h-5 text-emerald-400" />
                       <span className="text-xs font-mono font-bold uppercase tracking-wider text-emerald-400">
-                        Operational Action Plan ({activeIncident.decision.recommended_action.sop_reference})
+                        Operational Action Plan ({activeIncident.decision?.recommended_action.sop_reference ?? 'N/A'})
                       </span>
                     </div>
 
-                    {activeIncident.decision.recommended_action.escalation_required && (
+                    {activeIncident.decision?.recommended_action.escalation_required && (
                       <span className="text-[10px] font-mono bg-red-600 text-white px-2 py-0.5 font-bold uppercase">
                         REQUIRES MANAGER ESCALATION
                       </span>
@@ -429,11 +475,11 @@ export const SupervisorPage: React.FC = () => {
                   </div>
 
                   <p className="text-lg font-black text-white tracking-tight uppercase">
-                    {activeIncident.decision.recommended_action.action.replace(/_/g, ' ')}
+                    {activeIncident.decision?.recommended_action.action.replace(/_/g, ' ')}
                   </p>
 
                   <p className="text-zinc-300 text-sm leading-relaxed">
-                    <strong>Tactical Reason:</strong> {activeIncident.decision.recommended_action.reason}
+                    <strong>Tactical Reason:</strong> {activeIncident.decision?.recommended_action.reason}
                   </p>
                 </div>
 
@@ -479,10 +525,10 @@ export const SupervisorPage: React.FC = () => {
                 <div className="border-t border-white/10 pt-4 space-y-2 text-xs font-mono text-zinc-400">
                   <div className="flex items-start gap-2">
                     <strong className="text-zinc-200 shrink-0">ROOT CAUSE:</strong>
-                    <span className="text-zinc-300">{activeIncident.diagnostic.root_cause}</span>
+                    <span className="text-zinc-300">{activeIncident.diagnostic?.root_cause}</span>
                   </div>
                   <p className="text-zinc-400 italic text-[11px] leading-relaxed">
-                    {activeIncident.diagnostic.explanation}
+                    {activeIncident.diagnostic?.explanation}
                   </p>
                 </div>
               </div>
