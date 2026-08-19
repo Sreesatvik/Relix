@@ -1,50 +1,54 @@
 import asyncio
-from typing import Callable, List
-from datetime import datetime
 from models import Signal
+from data.generate_machine import generate_machine_signals
+from data.generate_quality import generate_quality_signals
+from data.generate_materials import generate_materials_signals
+from data.generate_logistics import generate_logistics_signals
+from data.generate_workforce import generate_workforce_signals
+from data.generate_demand import generate_demand_signals
+from monitor.risk_rules import compute_risk_score
+from agents.orchestrator import handle_incident
 
-# MOCK: P1 is supposed to implement this loop.
-# We implement a dummy version that fires a synthetic incident 
-# shortly after startup so we can test the orchestrator end-to-end.
+RISK_THRESHOLD = 0.25 # Set threshold so that our demo incidents trip it
 
-async def start(handle_incident_callback: Callable):
-    """
-    Mock Monitor Agent background loop.
-    Fires an incident after 3 seconds for testing purposes.
-    """
-    print("Monitor Agent started. Waiting 3 seconds before firing mock incident...")
-    await asyncio.sleep(3)
+async def run_monitor_loop(interval_seconds: int = 5):
+    print(f"Starting monitor agent loop. Scanning every {interval_seconds}s...")
     
-    mock_signals = [
-        Signal(
-            signal_id="SIG-TEST-1",
-            domain="machine",
-            entity_id="M17",
-            line_id="LINE-4",
-            timestamp=datetime.utcnow(),
-            metric_name="vibration_index",
-            value=4.8,
-            threshold=5.0,
-            severity_hint="HIGH",
-            text_note="Approaching threshold rapidly."
-        ),
-        Signal(
-            signal_id="SIG-TEST-2",
-            domain="quality",
-            entity_id="BATCH-099",
-            line_id="LINE-4",
-            timestamp=datetime.utcnow(),
-            metric_name="defect_rate",
-            value=3.2,
-            threshold=3.0,
-            severity_hint="MEDIUM",
-            text_note="Minor defect spike observed."
-        )
-    ]
-    
-    print(f"Monitor Agent: Risk detected on LINE-4! Calling orchestrator...")
-    await handle_incident_callback(mock_signals, "LINE-4")
-    
-    # After the first one, we just sleep forever so the server doesn't keep firing them
+    # We will track which lines have already fired to avoid spamming the orchestrator in the mock
+    _alerted_lines = set()
+
     while True:
-        await asyncio.sleep(60)
+        try:
+            # 1. Fetch all signals
+            all_signals = []
+            all_signals.extend(generate_machine_signals())
+            all_signals.extend(generate_quality_signals())
+            all_signals.extend(generate_materials_signals())
+            all_signals.extend(generate_logistics_signals())
+            all_signals.extend(generate_workforce_signals())
+            all_signals.extend(generate_demand_signals())
+            
+            # 2. Group by line_id
+            signals_by_line = {}
+            for s in all_signals:
+                if s.line_id not in signals_by_line:
+                    signals_by_line[s.line_id] = []
+                signals_by_line[s.line_id].append(s)
+                
+            # 3. Compute risk and fire alerts
+            for line_id, signals in signals_by_line.items():
+                risk = compute_risk_score(signals)
+                if risk >= RISK_THRESHOLD:
+                    if line_id not in _alerted_lines:
+                        print(f"\\n[Monitor] ALERT: {line_id} crossed threshold with risk {risk:.2f}")
+                        await handle_incident(signals, line_id)
+                        _alerted_lines.add(line_id)
+                else:
+                    # Reset if it goes below threshold
+                    if line_id in _alerted_lines:
+                        _alerted_lines.remove(line_id)
+            
+        except Exception as e:
+            print(f"[Monitor] Error in loop: {e}")
+            
+        await asyncio.sleep(interval_seconds)

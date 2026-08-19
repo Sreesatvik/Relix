@@ -1,0 +1,24 @@
+{
+  "dataset": "Edirin-Ako AI4I Predictive Maintenance",
+  "schema": {
+    "Air_temperature_K": "Float (e.g., 298.1, 300.2)",
+    "Process_temperature_K": "Float (e.g., 308.6, 311.1)",
+    "Rotational_speed_rpm": "Integer (e.g., 1551, 1408)",
+    "Torque_Nm": "Float (e.g., 42.8, 46.1)",
+    "Tool_wear_min": "Integer (e.g., 0, 110, 200)",
+    "Machine_failure": "Binary flag (0 or 1)",
+    "Failure_modes": {
+      "TWF": "Tool Wear Failure",
+      "HDF": "Heat Dissipation Failure",
+      "PWF": "Power Failure",
+      "OSF": "Overstrain Failure",
+      "RNF": "Random Failures"
+    }
+  },
+  "shap_explainability": {
+    "Tool_wear_failure": "High SHAP values for Tool_wear_min. When tool wear exceeds 200 mins, risk of TWF spikes.",
+    "Heat_dissipation_failure": "High SHAP values for the difference between Process and Air temperatures. Lower temperature difference reduces dissipation capability, causing failure.",
+    "Power_failure": "Driven by the product of Torque and Rotational speed. Very high or very low power leads to PWF.",
+    "Overstrain_failure": "Driven by the product of Tool wear and Torque. High torque and high tool wear cause OSF."
+  }
+}

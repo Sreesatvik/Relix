@@ -1,49 +1,77 @@
-import asyncio
-from typing import Dict, List, Any
+"""
+MCP Server Module
 
-# Mock MCP Tools for Phase 2 Testing
-# These simulate P2's tools so we can build and test our agents immediately.
+This file exposes the core Model Context Protocol (MCP) server endpoints.
+It provides the following 4 tools to the language model:
+1. get_domain_status
+2. get_signal_history
+3. search_knowledge_base
+4. get_business_context
+"""
 
-async def get_domain_status(domain: str, entity_id: str = None, line_id: str = None) -> Dict[str, Any]:
-    """Mock domain status retrieval."""
-    await asyncio.sleep(0.1) # Simulate network call
+from typing import Any, List, Dict, Optional
+from mcp_server.rag_store import search
+from data.generate_machine import generate_machine_signals
+from data.generate_quality import generate_quality_signals
+from data.generate_materials import generate_materials_signals
+from data.generate_logistics import generate_logistics_signals
+from data.generate_workforce import generate_workforce_signals
+from data.generate_demand import generate_demand_signals
+from data.business_context import BUSINESS_CONTEXT
+
+DOMAIN_GENERATORS = {
+    "machine": generate_machine_signals,
+    "quality": generate_quality_signals,
+    "materials": generate_materials_signals,
+    "logistics": generate_logistics_signals,
+    "workforce": generate_workforce_signals,
+    "demand": generate_demand_signals
+}
+
+async def get_domain_status(domain: str, entity_id: str = None, line_id: str = None) -> dict:
+    """
+    Retrieve the current status and latest signals for a specific operational domain.
+    """
+    if domain not in DOMAIN_GENERATORS:
+        return {"error": f"Domain '{domain}' not found.", "signals": []}
+        
+    signals = DOMAIN_GENERATORS[domain]()
+    
+    if entity_id:
+        signals = [s for s in signals if s.entity_id == entity_id]
+        
+    if line_id:
+        signals = [s for s in signals if s.line_id == line_id]
+        
     return {
         "domain": domain,
-        "line_id": line_id,
-        "entity_id": entity_id,
-        "current_status": "mocked_anomaly_detected",
-        "active_alerts": 1
+        "count": len(signals),
+        "signals": [s.model_dump(mode='json') if hasattr(s, "model_dump") else s.dict() for s in signals]
     }
 
-async def get_signal_history(entity_id: str, domain: str, hours: int = 72) -> List[Dict[str, Any]]:
-    """Mock signal history for trend analysis."""
-    await asyncio.sleep(0.1)
-    return [
-        {"timestamp": f"T-{hours}h", "value": 3.0, "metric": "mock_metric"},
-        {"timestamp": "T-24h", "value": 3.5, "metric": "mock_metric"},
-        {"timestamp": "T-0h", "value": 4.2, "metric": "mock_metric"}
-    ]
-
-async def search_knowledge_base(query: str, doc_type: str = None, top_k: int = 5) -> List[Dict[str, Any]]:
-    """Mock RAG search."""
-    await asyncio.sleep(0.2)
+async def get_signal_history(entity_id: str, domain: str, hours: int = 72) -> list[dict]:
+    """
+    Retrieve the historical progression of a specific metric for a specific entity.
+    Note: Since signal data is dynamically generated on the fly and not persisted, 
+    this currently returns only the single latest generated signal (the "current" state).
+    """
+    if domain not in DOMAIN_GENERATORS:
+        return []
+        
+    current_signals = DOMAIN_GENERATORS[domain]()
+    filtered = [s for s in current_signals if s.entity_id == entity_id]
     
-    if doc_type == "incident_report":
-        return [{"doc_id": "INC-1042", "content": "Similar pattern preceded a bearing failure 3 months ago on M12."}]
-    elif doc_type == "sop":
-        return [{"doc_id": "SOP-014", "content": "If bearing wear is detected, shift 30% load to alternate line to prevent failure."}]
-    elif doc_type == "escalation_policy":
-        return [{"doc_id": "ESC-001", "content": "Escalate to Plant Manager if cost exposure exceeds 1 Lakh INR."}]
-    
-    return [{"doc_id": "DOC-XYZ", "content": f"Mock result for {query}"}]
+    return [s.model_dump(mode='json') if hasattr(s, "model_dump") else s.dict() for s in filtered]
 
-async def get_business_context(line_id: str) -> Dict[str, Any]:
-    """Mock business context retrieval."""
-    await asyncio.sleep(0.1)
-    return {
-        "line_id": line_id,
-        "targets": {"daily_units": 10000, "produced_so_far": 1600},
-        "orders_at_risk": 2,
-        "cost_per_hour_downtime_inr": 12727,
-        "priority": "HIGH"
-    }
+async def search_knowledge_base(query: str, doc_type: str = None, top_k: int = 5) -> list[dict]:
+    """
+    Search the RAG store for standard operating procedures, root cause analyses,
+    incident reports, and response playbooks related to the query.
+    """
+    return search(query=query, doc_type=doc_type, top_k=top_k)
+
+async def get_business_context(line_id: str) -> dict:
+    """
+    Retrieve high-level business logic, schema, or system-wide context.
+    """
+    return BUSINESS_CONTEXT.get(line_id, {})
