@@ -3,6 +3,9 @@ import json
 from typing import List
 from openai import AsyncOpenAI
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from models import Signal, DiagnosticResult
 from mcp_server.server import get_domain_status, get_signal_history, search_knowledge_base

@@ -3,6 +3,9 @@ import json
 from typing import List
 from openai import AsyncOpenAI
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from models import Signal, DecisionResult
 from mcp_server.server import get_business_context, search_knowledge_base
